@@ -1,6 +1,7 @@
 use std::{fs, io, process};
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 
 use bytes::Bytes;
 use serde::Deserialize;
@@ -75,27 +76,17 @@ fn download_library(library: &Library) {
 }
 
 #[cfg(target_os = "windows")]
-fn launch(jre_path: String, main_class: String) {
-    let concat = format!("{}\\bin\\java.exe", jre_path);
-
-    let command = process::Command::new("cmd").args([
-        "cmd",
-        "/C",
-        &concat[..],
-        "-cp",
-        "libs/*",
-        &main_class[..]
-    ]).output().expect("Failed to execute process");
-
-    println!("{}", String::from_utf8_lossy(&*command.stderr))
+fn create_command() -> Command {
+    let mut command = Command::new("cmd");
+    command.arg("/C");
+    command
 }
 
 #[cfg(target_os = "linux")]
-fn launch(jre_path: String, main_class: String) {
-}
-
-#[cfg(target_os = "mac_os")]
-fn launch(jre_path: String, main_class: String) {
+fn create_command(jre_path: String, main_class: String) -> Command {
+    let mut command = Command::new("sh");
+    command.arg("-c");
+    command
 }
 
 fn main() {
@@ -111,7 +102,15 @@ fn main() {
 
     let jvm = settings.jvm;
 
-    let jre_path = unzip_jre::really_slow_unzip(jvm.url);
+    let output = create_command()
+        .args([
+            &format!("{}\\bin\\java.exe", unzip_jre::really_slow_unzip(jvm.url))[..],
+            "-cp",
+            "libs/*",
+            &jvm.main_class[..]
+        ])
+        .output()
+        .expect("Failed to run");
 
-    launch(jre_path, jvm.main_class);
+    println!("{}", String::from_utf8_lossy(&*output.stderr));
 }
