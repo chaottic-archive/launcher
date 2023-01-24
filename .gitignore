@@ -13,4 +13,5 @@
 
 /target
 /.idea/
-/launcher.json
+/settings.json
+/libraries/
