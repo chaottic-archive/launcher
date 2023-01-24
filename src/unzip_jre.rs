@@ -22,7 +22,7 @@ pub fn slow_unzip(url: Url) {
     //});
 }
 
-pub fn really_slow_unzip(url: Url) {
+pub fn really_slow_unzip(url: Url) -> String {
     let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create a temporary file");
 
     let content = download_blocking(&url).expect("Failed to get jvm archive");
@@ -47,4 +47,6 @@ pub fn really_slow_unzip(url: Url) {
 
         fs::File::create(path).and_then(|mut writer| io::copy(&mut file, &mut writer)).expect("");
     }
+
+    String::from("jdk-17.0.6+10-jre")
 }

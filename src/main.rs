@@ -1,4 +1,4 @@
-use std::{fs, io};
+use std::{fs, io, process};
 use std::io::Write;
 use std::path::Path;
 
@@ -74,10 +74,34 @@ fn download_library(library: &Library) {
     fs::write(path, buffer).expect("Failed to write downloaded library");
 }
 
-fn main() {
-    let json_file_path = &*fs::read_to_string(Path::new("settings.json")).expect("Missing json file");
+#[cfg(target_os = "windows")]
+fn launch(jre_path: String, main_class: String) {
+    let concat = format!("{}\\bin\\java.exe", jre_path);
 
-    let settings: Settings = serde_json::from_str(json_file_path).expect("Failed to read json file");
+    let command = process::Command::new("cmd").args([
+        "cmd",
+        "/C",
+        &concat[..],
+        "-cp",
+        "libs/*",
+        &main_class[..]
+    ]).output().expect("Failed to execute process");
+
+    println!("{}", String::from_utf8_lossy(&*command.stderr))
+}
+
+#[cfg(target_os = "linux")]
+fn launch(jre_path: String, main_class: String) {
+}
+
+#[cfg(target_os = "mac_os")]
+fn launch(jre_path: String, main_class: String) {
+}
+
+fn main() {
+    let json_path = &*fs::read_to_string(Path::new("settings.json")).expect("Missing json file");
+
+    let settings: Settings = serde_json::from_str(json_path).expect("Failed to read json file");
 
     let libraries = &settings.libraries;
 
@@ -85,5 +109,9 @@ fn main() {
         download_library(&library);
     }
 
-    unzip_jre::really_slow_unzip(settings.jvm.url);
+    let jvm = settings.jvm;
+
+    let jre_path = unzip_jre::really_slow_unzip(jvm.url);
+
+    launch(jre_path, jvm.main_class);
 }

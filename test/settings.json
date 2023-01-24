@@ -7,7 +7,7 @@
   "libraries": [
     {
       "url": "https://repo1.maven.org/maven2/co/datadome/fastutil/8.5.11.1/fastutil-8.5.11.1.jar",
-      "directory": "libraries/it/unimi/dsi/fastutil/8.5.9"
+      "directory": "libs/it/unimi/dsi/fastutil/8.5.9"
     }
   ]
 }
