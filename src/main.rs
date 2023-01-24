@@ -1,5 +1,4 @@
-use std::{fs, io, process};
-use std::io::Write;
+use std::{fs};
 use std::path::Path;
 use std::process::Command;
 
@@ -7,6 +6,7 @@ use bytes::Bytes;
 use serde::Deserialize;
 
 mod unzip_jre;
+mod concurrent;
 
 type Url = String;
 
@@ -24,55 +24,17 @@ struct Jvm {
 }
 
 #[derive(Deserialize)]
-struct Library {
+pub struct Library {
     url: Url,
     directory: Url
 }
 
-trait Localize {
-    fn localize(self: &Self) -> Option<String>;
-}
+// fn request_blocking(url: &Url) -> reqwest::Result<Bytes> {
+//     reqwest::blocking::get(url)?.bytes()
+// }
 
-impl Localize for String {
-    fn localize(self: &Self) -> Option<String> {
-        if self.is_empty() {
-            ()
-        }
-
-        let path = Path::new(self);
-
-        let (stem, extension) = (path.file_stem()?.to_str()?, path.extension()?.to_str()?);
-
-        Some(format!("{}.{}", stem, extension))
-    }
-}
-
-fn download_blocking(url: &Url) -> reqwest::Result<Bytes> {
-    reqwest::blocking::get(url)?.bytes()
-}
-
-// TODO:: Concurrent.
-fn download_library(library: &Library) {
-    let directory = &library.directory;
-
-    let mut path = Path::new(directory);
-
-    if !path.exists() {
-        fs::create_dir_all(path).expect("Failed to create directories");
-    }
-
-    let url = &library.url;
-
-    let concat = format!("{}/{}", library.directory, &url.localize().expect("Missing library download url"));
-
-    path = Path::new(&concat);
-    if path.exists() {
-        return;
-    }
-
-    let buffer = download_blocking(&url).unwrap();
-
-    fs::write(path, buffer).expect("Failed to write downloaded library");
+async fn request_non_blocking(url: &Url) -> Result<Bytes, reqwest::Error> {
+    reqwest::get(url).await?.bytes().await
 }
 
 #[cfg(target_os = "windows")]
@@ -89,16 +51,15 @@ fn create_command(jre_path: String, main_class: String) -> Command {
     command
 }
 
-fn main() {
-    let json_path = &*fs::read_to_string(Path::new("settings.json")).expect("Missing json file");
+#[tokio::main]
+async fn main() {
+    let json_path = &*fs::read_to_string(Path::new("settings.json")).unwrap();
 
-    let settings: Settings = serde_json::from_str(json_path).expect("Failed to read json file");
+    let settings: Settings = serde_json::from_str(json_path).unwrap();
 
-    let libraries = &settings.libraries;
+    let libraries = settings.libraries;
 
-    for library in libraries {
-        download_library(&library);
-    }
+    concurrent::create_libraries(libraries).await;
 
     let jvm = settings.jvm;
 
@@ -110,7 +71,7 @@ fn main() {
             &jvm.main_class[..]
         ])
         .output()
-        .expect("Failed to run");
+        .unwrap();
 
     println!("{}", String::from_utf8_lossy(&*output.stderr));
 }
