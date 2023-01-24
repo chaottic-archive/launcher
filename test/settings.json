@@ -1,0 +1,13 @@
+{
+  "jvm": {
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jre_x64_windows_hotspot_17.0.6_10.zip",
+    "arguments": [],
+    "main_class": ""
+  },
+  "libraries": [
+    {
+      "url": "https://repo1.maven.org/maven2/co/datadome/fastutil/8.5.11.1/fastutil-8.5.11.1.jar",
+      "directory": "libraries/it/unimi/dsi/fastutil/8.5.9"
+    }
+  ]
+}
