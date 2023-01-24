@@ -46,39 +46,11 @@ impl Localize for String {
     }
 }
 
-fn download_and_run_jvm(settings: &Settings) {
-    let url = &settings.jvm.url;
-
-    let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create a temporary file");
-
-    let content = download_blocking(url).expect("Failed to get jvm archive");
-
-    temp_file.write_all(&*content).expect("Failed to write to temporary file");
-
-    let mut archive = zip::ZipArchive::new(temp_file).expect("Failed to create zip archive.");
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).expect("Failed to get archive entry");
-
-        let path = file.enclosed_name().to_owned().expect("");
-        if path.to_str().and_then(|str| str.chars().last()).unwrap() == '/' {
-            continue
-        }
-
-        if let Some(p) = path.parent() {
-            if !p.exists() {
-                fs::create_dir_all(p).expect("")
-            }
-        }
-
-        fs::File::create(path).and_then(|mut writer| io::copy(&mut file, &mut writer)).expect("");
-    }
-}
-
 fn download_blocking(url: &Url) -> reqwest::Result<Bytes> {
     reqwest::blocking::get(url)?.bytes()
 }
 
+// TODO:: Concurrent.
 fn download_library(library: &Library) {
     let directory = &library.directory;
 
@@ -113,5 +85,5 @@ fn main() {
         download_library(&library);
     }
 
-    unzip_jre::slow_unzip(settings.jvm.url);
+    unzip_jre::really_slow_unzip(settings.jvm.url);
 }
