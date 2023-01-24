@@ -5,6 +5,8 @@ use std::path::Path;
 use bytes::Bytes;
 use serde::Deserialize;
 
+mod unzip_jre;
+
 type Url = String;
 
 #[derive(Deserialize)]
@@ -49,7 +51,7 @@ fn download_and_run_jvm(settings: &Settings) {
 
     let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create a temporary file");
 
-    let content = get_content(url).expect("Failed to get jvm archive");
+    let content = download_blocking(url).expect("Failed to get jvm archive");
 
     temp_file.write_all(&*content).expect("Failed to write to temporary file");
 
@@ -73,12 +75,13 @@ fn download_and_run_jvm(settings: &Settings) {
     }
 }
 
-fn get_content(url: &Url) -> reqwest::Result<Bytes> {
+fn download_blocking(url: &Url) -> reqwest::Result<Bytes> {
     reqwest::blocking::get(url)?.bytes()
 }
 
 fn download_library(library: &Library) {
     let directory = &library.directory;
+
     let mut path = Path::new(directory);
 
     if !path.exists() {
@@ -93,9 +96,10 @@ fn download_library(library: &Library) {
     if path.exists() {
         return;
     }
-    let content = get_content(&url).expect("");
 
-    fs::write(path, content).expect("Failed to write downloaded library")
+    let buffer = download_blocking(&url).unwrap();
+
+    fs::write(path, buffer).expect("Failed to write downloaded library");
 }
 
 fn main() {
@@ -109,5 +113,5 @@ fn main() {
         download_library(&library);
     }
 
-    download_and_run_jvm(&settings);
+    unzip_jre::slow_unzip(settings.jvm.url);
 }
