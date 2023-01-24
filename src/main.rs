@@ -1,8 +1,8 @@
-use std::{fs, io};
+use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use reqwest::blocking::Response;
+use bytes::Bytes;
 use serde::Deserialize;
 
 type Url = String;
@@ -26,12 +26,12 @@ struct Library {
     directory: Url
 }
 
-trait ToLocalPath {
-    fn to_local_path(self: &Self) -> Option<String>;
+trait Localize {
+    fn localize(self: &Self) -> Option<String>;
 }
 
-impl ToLocalPath for String {
-    fn to_local_path(self: &Self) -> Option<String> {
+impl Localize for String {
+    fn localize(self: &Self) -> Option<String> {
         if self.is_empty() {
             ()
         }
@@ -40,41 +40,33 @@ impl ToLocalPath for String {
 
         let (stem, extension) = (path.file_stem()?.to_str()?, path.extension()?.to_str()?);
 
-        let concat = format!("{}.{}", stem, extension);
-
-        return Some(concat)
+        Some(format!("{}.{}", stem, extension))
     }
 }
 
-fn download_library(&lib: &Library) {
-    let directory = lib.directory.to_local_path().expect("Missing library directory.");
-    let directory_path = Path::new(&directory);
+fn get_content(url: &Url) -> reqwest::Result<Bytes> {
+    reqwest::blocking::get(url)?.bytes()
+}
 
-    if !directory_path.exists() {
-        fs::create_dir_all(directory_path).expect(&*format!("Failed to create directories {}", &directory))
-    }
+fn download_library(library: &Library) {
+    let download = &library.download;
 
-    let download_url = lib.download;
+    let concat = format!("{}/{}", library.directory, &download.localize().expect("Missing library download url"));
 
-    let concat = format!("{}/{}", directory, download_url.to_local_path().expect("Missing download url."));
-    let download_path = Path::new(&concat);
-
-    if download_path.exists() {
+    let path = Path::new(&concat);
+    if path.exists() {
         return;
     }
 
+    let content = get_content(&download).expect("");
 
+    fs::write(path, content).expect("Failed to write downloaded library")
 }
 
-#[tokio::main]
-async fn main() {
-    let path = &*fs::read_to_string(Path::new("settings.json")).expect("Unable to find json file.");
+fn main() {
+    let json_file_path = &*fs::read_to_string(Path::new("settings.json")).expect("Missing json file");
 
-    let settings: Settings = serde_json::from_str(path).expect("Failed to read json file");
-
-    let mut url = settings.jvm.download;
-
-    let _path = url.to_local_path();
+    let settings: Settings = serde_json::from_str(json_file_path).expect("Failed to read json file");
 
     let libraries = settings.libraries;
 
