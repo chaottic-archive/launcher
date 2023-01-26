@@ -1,16 +1,16 @@
 use std::fs;
-use std::io::Write;
+use std::io::{Error, ErrorKind, Write};
 use std::path::Path;
 
 use futures::{stream, StreamExt};
 
-use crate::{Library, request_non_blocking, Url};
+use crate::{get_bytes, Library, Url};
 
-enum Err {
-
+fn local_from_library(library: &Library) -> Option<Url> {
+    local(&library.directory, &library.url)
 }
 
-async fn from_url(directory: &Url, url: &Url) -> Option<String> {
+fn local(directory: &Url, url: &Url) -> Option<Url> {
     let path = Path::new(&url);
 
     let (stem, extension) = (path.file_stem()?.to_str()?, path.extension()?.to_str()?);
@@ -18,50 +18,51 @@ async fn from_url(directory: &Url, url: &Url) -> Option<String> {
     Some(format!("{}/{}.{}", directory, stem, extension))
 }
 
+// TODO:: Remove 'unwrap'
 async fn create_library(library: &Library) -> Result<(), reqwest::Error> {
     let url = &library.url;
 
-    let buffer = request_non_blocking(url).await?;
+    let buffer = get_bytes(url).await?;
 
-    // let from_url = from_url(&library.directory, url).await.ok_or())?;
+    let local = local_from_library(&library).unwrap();
 
-    let path = Path::new(&from_url);
+    let path = Path::new(&local);
 
     if let Some(p) = path.parent() {
         if !p.exists() {
-            fs::create_dir_all(p).ok()?;
+            fs::create_dir_all(p).unwrap();
         }
     }
-
-    fs::write(path, buffer).ok()?;
 
     Ok(())
 }
 
-fn filter_library(library: &Library) -> Option<bool> {
+fn filter_library(library: &Library) -> Option<()> {
     let url = &library.url;
 
     if url.is_empty() { return None; }
 
-    let from_url = from_url(&library.directory, &url)?;
+    let local = local_from_library(&library)?;
 
-    let path = Path::new(from_url);
+    let path = Path::new(&*local);
 
     if path.exists() { return None; }
 
-    Some(false)
+    Some(())
 }
 
-pub async fn create_libraries(libraries: Vec<Library>) {
-    let stream = stream::iter(libraries.iter().filter(|&library| {filter_library(library).unwrap()}).map(create_library));
+pub(crate) async fn create_libraries(libraries: Vec<Library>) {
+    let stream = stream::iter(libraries.iter().filter(|&library| {filter_library(library).is_some()}).map(create_library));
 
-    // stream.for_each_concurrent(1, |f| async move { f.await.unwrap(); }).await;
+    stream.for_each_concurrent(1, |f| async move { f.await.unwrap(); }).await;
 }
 
+
+// TODO::
 async fn create_temporary(url: Url) {
     let mut temp = tempfile::NamedTempFile::new().unwrap();
 
-    let buffer = request_non_blocking(&url).await.unwrap();
+    let buffer = get_bytes(&url).await.unwrap();
 
     temp.write_all(&*buffer).unwrap();
 }

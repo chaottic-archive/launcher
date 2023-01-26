@@ -29,11 +29,11 @@ pub struct Library {
     directory: Url
 }
 
-// fn request_blocking(url: &Url) -> reqwest::Result<Bytes> {
+// fn get_bytes_blocking(url: &Url) -> reqwest::Result<Bytes> {
 //     reqwest::blocking::get(url)?.bytes()
 // }
 
-async fn request_non_blocking(url: &Url) -> Result<Bytes, reqwest::Error> {
+async fn get_bytes(url: &Url) -> Result<Bytes, reqwest::Error> {
     reqwest::get(url).await?.bytes().await
 }
 
@@ -51,11 +51,15 @@ fn create_command(jre_path: String, main_class: String) -> Command {
     command
 }
 
+fn create_settings() -> Option<Settings> {
+    let str = &*fs::read_to_string(Path::new("settings.json")).ok()?;
+
+    Some(serde_json::from_str(str).ok()?)
+}
+
 #[tokio::main]
 async fn main() {
-    let json_path = &*fs::read_to_string(Path::new("settings.json")).unwrap();
-
-    let settings: Settings = serde_json::from_str(json_path).unwrap();
+    let settings = create_settings().unwrap();
 
     let libraries = settings.libraries;
 
