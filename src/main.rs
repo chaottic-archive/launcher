@@ -3,7 +3,9 @@ use std::path::Path;
 use std::process::Command;
 
 use bytes::Bytes;
+use log::info;
 use serde::Deserialize;
+use simple_logger::SimpleLogger;
 
 mod unzip_jre;
 mod concurrent;
@@ -18,6 +20,7 @@ struct Settings {
 
 #[derive(Deserialize)]
 struct Jvm {
+    jre: Url,
     url: Url,
     main_class: Url,
     arguments: Vec<String>
@@ -45,7 +48,7 @@ fn create_command() -> Command {
 }
 
 #[cfg(target_os = "linux")]
-fn create_command(jre_path: String, main_class: String) -> Command {
+fn create_command() -> Command {
     let mut command = Command::new("sh");
     command.arg("-c");
     command
@@ -59,6 +62,8 @@ fn create_settings() -> Option<Settings> {
 
 #[tokio::main]
 async fn main() {
+    SimpleLogger::new().init().unwrap();
+
     let settings = create_settings().unwrap();
 
     let libraries = settings.libraries;
@@ -67,15 +72,17 @@ async fn main() {
 
     let jvm = settings.jvm;
 
+    unzip_jre::really_slow_unzip(jvm.url);
+
     let output = create_command()
         .args([
-            &format!("{}\\bin\\java.exe", unzip_jre::really_slow_unzip(jvm.url))[..],
+            &format!("{}\\bin\\java.exe", jvm.jre)[..],
             "-cp",
-            "libs/*",
+            "jars/*",
             &jvm.main_class[..]
         ])
         .output()
         .unwrap();
 
-    println!("{}", String::from_utf8_lossy(&*output.stderr));
+    info!("{}", String::from_utf8_lossy(&*output.stderr));
 }
