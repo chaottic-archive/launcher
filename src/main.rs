@@ -1,4 +1,4 @@
-use std::{fs};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -7,7 +7,6 @@ use log::info;
 use serde::Deserialize;
 use simple_logger::SimpleLogger;
 
-mod unzip_jre;
 mod concurrent;
 
 type Url = String;
@@ -72,7 +71,7 @@ async fn main() {
 
     let jvm = settings.jvm;
 
-    unzip_jre::really_slow_unzip(jvm.url);
+    concurrent::create_jre(jvm.url, &jvm.jre).await;
 
     let output = create_command()
         .args([

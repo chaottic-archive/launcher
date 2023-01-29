@@ -1,11 +1,13 @@
 use std::fs;
-use std::io::{Error, ErrorKind, Write};
+use std::io::{Write};
 use std::path::Path;
 
 use futures::{stream, StreamExt};
 use log::info;
 
 use crate::{get_bytes, Library, Url};
+
+// TODO:: Remove unneeded 'unwrap'
 
 fn url_from_library(library: &Library) -> Option<Url> {
     let url = &library.url;
@@ -17,7 +19,6 @@ fn url_from_library(library: &Library) -> Option<Url> {
     Some(format!("{}/{}.{}", library.directory, stem, extension))
 }
 
-// TODO:: Remove 'unwrap'
 async fn create_library(library: &Library) -> Result<(), reqwest::Error> {
     let bytes = get_bytes(&library.url).await?;
 
@@ -56,15 +57,26 @@ pub(crate) async fn create_libraries(libraries: Vec<Library>) {
     stream.for_each_concurrent(2, |f| async move { f.await.unwrap(); }).await;
 }
 
-
-// TODO::
-async fn create_temporary(url: Url) {
-    let mut temp = tempfile::NamedTempFile::new().unwrap();
+async fn create_archive(url: Url) -> Option<()> {
+    let mut temp = tempfile::NamedTempFile::new().ok()?;
 
     let buffer = get_bytes(&url).await.unwrap();
 
-    temp.write_all(&*buffer).unwrap();
+    temp.write_all(&*buffer).ok()?;
+
+    zip::ZipArchive::new(temp).ok()?.extract(Path::new(".")).ok()?;
+
+    Some(())
 }
 
-pub(crate) async fn create_jre() {
+pub(crate) async fn create_jre(url: Url, directory: &Url) {
+    let path = Path::new(&directory);
+
+    if path.exists() {
+        return;
+    }
+
+    info!("Downloading the JRE");
+
+    create_archive(url).await.unwrap();
 }
